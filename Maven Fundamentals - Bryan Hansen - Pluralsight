@@ -1,0 +1,178 @@
+Maven Fundamentals - Bryan Hansen - Pluralsight
+===============================================
+
+Introduction to Maven fundamentals
+----------------------------------
+2) High level overview
+- It is a build tool - build source code
+- Always produces ONE artifact
+- Manages dependencies - biggest usage
+- handles versioning and meta info ( SCM info, maintainer info)
+- easily produce javadocs and other info
+- built around versioning
+
+Advantages
+- Repeatable builds: can be built for any env
+- Transitive dependencies: downloads dependencies of a dependency
+
+3) ANT vs Maven
+- Replacement for MAKE
+- Cross-platform
+- Not a build-tool, scripting tool
+- 
+
+pom.xml
+-------
+<project>
+	<groupId>com.pluralsight</groupId>							//name of org
+	<artifactId>HelloWorld</artifactId>							//name of app
+	<version>1.0-SNAPSHOT</version>								//version of app
+	<modelVersion>4.0</modelVersion>							//xml schema/version
+	<packaging>jar</packaging>
+</project>
+
+2) Maven Structure
+Folder structure
+----------------
+- src/main/java/												//contains all classes
+	- where all java code is stored
+	- beginning package declaration (com.company.division), each is a sub directory
+	- 
+- target														//contains the output
+	- package is created from this directory (jar/war)
+- pom.xml
+- src/test/java													//contains all unit test code
+
+pom.xml
+-------
+- divided into 4 basic parts:
+	1) project info
+		- groupId
+		- artifactId
+		- version
+		- packaging
+	
+	2) dependencies
+		- build dependencies for the app
+		
+	3) Build											//all types of defaults; ex. jarname, etc.
+		- plugins
+		- dir struct: to override default
+		
+	4) Repositories
+	
+Dependencies
+------------
+- to add dependency: we have to enter its groupId, artifactId and version
+
+Goals
+-----
+- clean: deletes target dir and any generated resources
+- compile: compies source code, generates any files and copies resources to classes dir
+- package: compile, run tests and package
+- install: runs package command, place in local repo(.m2)
+- deploy: run install and copy to remote file location
+
+Local repo structure
+---------------------
+- Maven stores everything it downloads in ~/.m2/repository/
+	- dependencies are stored here; follows groupId, artifactId and version in path
+- 
+
+3) Maven dependencies
+=====================
+Overview
+--------
+- need minimum of three things: groupId, artifactId, version
+
+Versions
+--------
+- SNAPSHOT for internal builds
+	- checks for new code every time
+- changes always downloaded
+- NEVER delpoyed to prod
+
+- no naming convention for releases
+- milestone and RC are used in bigger orgs
+- release/final is used for prod build
+
+Types
+------
+- packaging types: pom, jar, maven-plugin, ejb, war, ear, rar, par
+	- all dependencies are downloaded into package in pom type
+	
+Scopes
+------
+- 6 scopes for dependencies:
+	- compile: default; artifacts available everywhere
+	- provided: similar to compile; artifact provided where deployed
+	- runtime: needed only for execution; not included in final artifact
+	- test: available for test compilation and execution
+	- system: NOT to be used with maven
+	- import: ...
+	
+4) Maven Repositories
+=====================
+Local repo
+- Stores everything downloaded by maven; ~/.m2/repository/
+- Stores using info provided( 3 things )
+- This avoids duplication
+Repositories
+------------
+- HTTP accessible location to download files from
+- Default location: repo.maven.apache.org/maven2													//has almost everything required
+- Multiple repos can be used
+- Corporate repo: Nexus and Artifactory
+Dependency repository
+---------------------
+- Can contain releaes and/or snapshots; not uncommon to have them separate in repos
+- To specify repo; <repositories></repositories> in pom.xml
+
+Plugin Repository
+-----------------
+- can be specified using <pluginrepository></pluginrepository>
+
+5) Maven Plugins
+================
+- <build></build> in pom is used to setup plugins; used with the 3 imp info
+- default goals are built-in plugins
+- super pom has these defined and inherited in app pom
+- goals are tied to a phase
+
+Phases and goals
+----------------
+- validate: validates that the project is correct and all the info is available - plugins, artifacts
+- compile: compile the source code of project
+- test: test the complied source code
+- package: packages code in defined package
+- integration-test: deploy and run integration-test
+- verify: runs checks against package to verify integrity
+- install: install package in local repo
+- deploy: copy package to a remote repo
+
+Compiler plugin
+---------------
+- used to compile and test code
+- defaults to jdk 1.5 regardless of installed jdk; most overridden due to this
+- Its config section allows customization of: - fork
+											  - min/max memory
+											  - source							//java-versions
+											  - target							//java-versions
+											  
+Jar plugin
+----------
+- used to package a jar file
+- tied to package phase
+- config allows to: include/exclude			//stuff in package
+					manifest				//metadata
+					
+Source plugin
+-------------
+- used to attach source code to a jar
+- tied to package phase
+- generates a -sources.jar
+
+Javadoc plugin
+--------------
+- used to attach javadocs to jar 
+- defaults are used; but many customization options is available
