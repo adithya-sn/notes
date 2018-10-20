@@ -1,0 +1,21 @@
+Spinnaker with Kubernetes
+=========================
+- currently supports Kubernetes, AWS, Azure and OpenStack
+- allows multi-cloud delpoyments
+- **Canary release is a technique to reduce the risk of introducing a new software version in production by slowly rolling out the change to a small subset of users before rolling it out to the entire infrastructure and making it available to everybody.
+- Terminology
+	- app: collection of resources - LBs, SGs, server farm/group, 
+	- cluster: collection of server groups ||| deployment in kube
+	- server group: collection of stateless instances ||| to auto-scaling group in aws or replica set in kube
+	- LB: straight map from cloud provided LB; ON KUBE, IT IS A SERVICE, can be any type
+	- SG: firewall on AWS; on KUBE == ingress
+	- pipeline: 
+	- strategy: type of deployment - B-G, Canary
+- hard to install w/o templates; easiest way to install is via helm
+- bloated and resource-heavy
+- to install helm and spinnaker
+	- helm init
+	- helm version
+	- helm install -n kubelive stable/spinnaker
+	
+- kubectl port-forward		//to expose it
