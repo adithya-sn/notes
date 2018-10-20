@@ -1,0 +1,38 @@
+Ansible Essentials: Simplicity in Automation Technical Overview (DO007)
+-----------------------------------------------------------------------
+
+- Comes builtin with 450+ modules
+- Maintain playbooks via some SCM
+- installation: - pip install ansible
+				- sudo yum install ansible								//EPEL required
+				- sudo apt-get install ansible							//PPA repo required
+				
+How ansible works:
+- playbooks are in YAML
+- playbooks invokes modules via tasks; modules are executable bits of code run on target machines
+- runs sequentially
+- modules acts against inventory; contains list of target machines
+- various python apis to extend ansible connection types; callback, filter, other lookup
+
+- shell, command and raw; raw: similar to ssh -t ''
+
+Ad-hoc commands: one-off commands
+- ansible all -m ping
+- ansible web -m command -a "uptime"
+- ansible localhost -m setup
+
+Inventory
+- hosts
+- groups
+- inventory-specific data
+- static/dynamic
+
+- -a for arguments and -b for become when running ad-hoc commands
+
+Variables
+- can be facts, paths or pkg versions
+- precedence: extra > task vars > block vars > role and include vars > ... > set_facts > .. > host facts > ..
+
+Playbooks
+- remote_user to specify the user
+- meta: flush_handlers to run handler immediately
