@@ -1,0 +1,184 @@
+Cgroups, namespaces, and beyond: what are containers made from?
+===============================================================
+
+- chroot on steroids; normal processes running on a normal kernel
+- containers are not in kernel; what is in kernel is cgroups and namespaces
+- cgroups lets implement limiting and metering on resources used by processes ( blk IO, nw IO, CPU, RAM, SELinux ); "crowd-control"
+- subsystems i.e. cpu, memory.. 
+- each has a hierarchy of its own and all are independent
+	Memory cgroups
+	--------------
+	- memory cgroups: can count how much memory is used by each process or a group of processes; granularity: memory page(4kB on most arch) not a byte
+	- keeps track of pages by groups like 
+		file - read/write/mmap from block devices
+		anonymous - stack/heap/anonymous mmap
+		active - recently accessed
+		inactive - candidate for eviction
+	- file pages can be tracked down to a location on disk ( i.e. it was loaded from the disk ); can be removed as its still on disk
+	- anonymous page does not correspond to something on disk( malloc ); cannot reclaim and needs swapping out 
+	- in the kernel its classified into active and inactive
+	- initially everything is active and as its not being used, its moved arbitrarily into inactive; goes back to active when needed ( on-demand )
+	- if multiple groups are using the same page, only one of them is billed; it is invisible in other groups
+	
+	- each group has its own limits; its optional and can choose bw soft and hard
+	- if memory consumption goes over HARD limit process gets killed; as each group has its limits it kills only inside the affected container; a reason to have only one service per container
+	- soft limit allows to go past limit; in case of OOM, it kills the processes execcding the soft limit the most ( priority )
+	- can be set for physical(+swap)/kernel/total memories
+	- when hard limit is exceeded, all ps in group is frozen, notify user space, upon notif, can decide bw killing container/giving more memory/move container to another machine
+	- moving back and forth bw active and inactive reduces performance as counters are updated; cannot be enabled/disabled per ps and togglable at boot time only
+	
+	
+	
+	Huge TLB cgroup
+	---------------
+	- A translation lookaside buffer (TLB) is a memory cache that is used to reduce the time taken to access a user memory location.[1][2] It is a part of the chip’s memory-management unit (MMU). The TLB stores the recent translations of virtual memory to physical memory and can be called an address-translation cache. A TLB may reside between the CPU and the CPU cache, between CPU cache and the main memory or between the different levels of the multi-level cache. The majority of desktop, laptop, and server processors include one or more TLBs in the memory-management hardware, and it is nearly always present in any processor that utilizes paged or segmented virtual memory. 
+	- ref: https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/performance_tuning_guide/s-memory-transhuge
+	- limit amount of huge TLB available
+	
+	CPU cgroup
+	----------
+	- keeps track of user/system CPU time ( CPU time (or process time) is the amount of time for which a central processing unit (CPU) was used for processing instructions of a computer program or operating system )
+	- User CPU time is time spent on the processor running your program's code (or code in libraries); system CPU time is the time spent running code in the operating system kernel on behalf of your program.
+	- keeps track of usage per CPU and allows to set weights
+	- Not possible to set CPU limits 
+	
+	CPUset cgroup
+	-------------
+	- allows to pin ps groups to a CPU(s); reserve CPU for specific apps; avoid ps bouncing bw CPUs
+	- good with NUMA systems
+	- 
+	
+	BlockIO cgroup
+	--------------
+	- measure and limit amount of block IO used by cgroups and containers
+	- tracks usage "per group per block device"; reads vs writes; sync vs async
+		- sync are syscalls, async are all writes ( goes to page cache > kernel 
+	- set throttles, for each group: pe block device, read vs write, ops vs bytes	
+	
+	Net_cls and net_prio cgroup
+	---------------------------
+	- cls: classifier; prio: priority
+	- not so good, adds tags and based on it processing/shaped differently and TC ( trfc ctrl )
+	
+	Device cgroup
+	-------------
+	- which container can r/rw on which device nodes; perms includes read/write/mknod
+	- prevents container from getting access to host OS fs
+	- typical use: allow /dev/{tty, zero, random, null} ..
+				   deny everything else
+	- interesting nodes: /dev/net/tun ( nw ifc manipulation ) - VPN
+						 /dev/fuse	  ( fs in user space ) - custom fs in containers
+						 /dev/kvm     ( VMs in containers ) 
+						 /dev/dri	  ( GPU ) - mining/GPU intensive stuff on containers
+						 
+	Freezer cgroup
+	--------------
+	- freeze/thaw group of processes; similar to SIGSTOP /SIGCONT; difference is that it cannot be detected by pses
+	- helps in job scheduling and ps migration
+	- 
+	
+	Subtleties
+	----------
+	- PID 1 is placed at root of each hierarchy
+	- new ps start in parent grps
+	- groups are materialzied by pseudo-fs ( /sys/fs/cgroup )
+	- groups are created by mkdir in pseudo-fs; ex. mkdir /sys/fs/cgroup/memory/somegroup/subcgroup
+	- to move pses echo $PID > /sys/fs/cgroup/.../tasks
+	- cgroup wars: ex. to dedicate CPU to ps, all other users have to agree
+
+Namespaces
+----------
+- limiting what you can view while cgroups is limiting what you can use; quality vs quantity
+- provide process of their own system view
+- multiple namespaces: pid, net, mnt, uts, ipc, user
+- each ps is in one namespace of each type
+	- pid: 
+		- ps within a PID namespace can see only pses in same namespace
+		- each has its own numbering starting at 1; if its killed whole namespace is killed
+		- it can be nested and therefore one ps can have different PID at different level; its different from one on machine
+		
+	- network namespace:
+		- pses in a namespace get their own nw stack including: ifcs, RTs, iptable rules, sockets
+		- nw ifcs can be moved across containers
+		- typical use case is in Veth pairs
+		
+	- mnt namespace:
+		- mount not being visible across containers
+		- pses can have their own rootfs; similar to chroot
+		- mounts can be pvt or shared
+		- cannot be passed across containers
+	
+	- utc namespace:
+		- allows each container to have its own hostname
+		
+	- ipc namespace:
+		- allows a process to have its own IPC semaphores, msg queues and shared memory w/o risk of conflicting with other containers
+		
+	- user namespace:
+		- allows to map UIDs/GIDs
+		- ex. root in container but not outside
+		
+namespace manipulation
+----------------------
+- created with clone() syscall
+- materialized by pseudo files
+- when last ps in it exits it is destroyed; can bind-mount to retain
+- it is possible to enter a ns with setns()
+
+Copy-on-write
+--------------
+- create a new container instantly
+- storage keeps track of changes
+	- AUFS, overlay - file level
+	- device mapper thinp - block level
+	- BTRFS, ZFS - FS level
+- reduces footprint and boot time
+
+Orthogonality
+-------------
+- all features can be used independently
+
+Missing bits
+------------
+- allows to keep root but without dangerous perms like CAP_SYS_ADMIN
+
+LXC
+---
+- set of userland tools
+- container is in /var/lib/lxc
+- small cfg file + root fs
+- no CoW support
+- no support to moave images
+- hard to setup
+
+systemd-nspawn
+--------------
+- for debugging, testing and building
+- similar to chroot but powerful
+- implements container interface
+- has support for docker
+
+Docker engine
+-------------
+- used to run with lxc
+- libcontainer helps run w/o LXC
+- daemon controlled by REST api
+
+rkt, runC
+----------
+- focus on container, no api, build, images
+- runC implements OCP ( Open Container Project )
+- runC leverages libcontainer
+- rkt implements appc
+
+Jails/zones
+-----------
+- OpenBSD/Solaris
+- 
+
+Other facts
+-----------
+- OOM killer on Linux kicks in and kills processes
+- kernel memory - Dentries, inodes ( internal nodes ), resident size, swap
+- Memory is divided into protected zone(Kernel space) and unprotected zone(user space). In a 32 bit architecture, CPU can generate 2^32 i.e 4GB virtual memory, in which 1GB is reserved for kernel-space which has full access to Hardware and system resource whereas 3GB is reserved for user-space where normal user process runs and they can see only subset of the machine’s available resources and can perform certain system functions.
+- 
